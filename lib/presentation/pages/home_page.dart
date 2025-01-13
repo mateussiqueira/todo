@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:intl/intl.dart';
 
-import '../providers/list_notifier.dart';
+import '../providers/list_provider.dart';
 import 'list_page.dart';
 
 class HomePage extends ConsumerStatefulWidget {
@@ -40,24 +41,54 @@ class _HomePageState extends ConsumerState<HomePage> {
             onPressed: () {
               _showAddListDialog(context, ref);
             },
-          )
+          ),
         ],
       ),
       body: lists.when(
-        data: (data) {
-          if (data.isEmpty) {
+        data: (lists) {
+          if (lists.isEmpty) {
             return Center(child: Text('Nenhuma lista disponível'));
           }
           return ListView.builder(
-            itemCount: data.length,
+            itemCount: lists.length,
             itemBuilder: (context, index) {
+              final list = lists[index];
+              final createdAt =
+                  DateFormat('dd/MM/yyyy HH:mm').format(list.createdAt);
+              final updatedAt =
+                  DateFormat('dd/MM/yyyy HH:mm').format(list.updatedAt);
+
               return ListTile(
-                title: Text(data[index].name),
+                title: Text(list.name),
+                subtitle: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Criado em: $createdAt'),
+                    Text('Atualizado em: $updatedAt'),
+                  ],
+                ),
+                trailing: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    IconButton(
+                      icon: Icon(Icons.edit),
+                      onPressed: () {
+                        _showEditListDialog(context, ref, list.id, list.name);
+                      },
+                    ),
+                    IconButton(
+                      icon: Icon(Icons.delete),
+                      onPressed: () {
+                        _showDeleteListDialog(context, ref, list.id);
+                      },
+                    ),
+                  ],
+                ),
                 onTap: () {
                   Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (context) => ListPage(listId: data[index].id),
+                      builder: (context) => ListPage(listId: list.id),
                     ),
                   );
                 },
@@ -72,7 +103,7 @@ class _HomePageState extends ConsumerState<HomePage> {
   }
 
   void _showAddListDialog(BuildContext context, WidgetRef ref) {
-    final TextEditingController controller = TextEditingController();
+    final TextEditingController nameController = TextEditingController();
 
     showDialog(
       context: context,
@@ -80,7 +111,7 @@ class _HomePageState extends ConsumerState<HomePage> {
         return AlertDialog(
           title: Text('Adicionar Nova Lista'),
           content: TextField(
-            controller: controller,
+            controller: nameController,
             decoration: InputDecoration(hintText: 'Nome da Lista'),
           ),
           actions: [
@@ -92,14 +123,81 @@ class _HomePageState extends ConsumerState<HomePage> {
             ),
             TextButton(
               onPressed: () async {
-                final listName = controller.text;
-                if (listName.isNotEmpty) {
-                  await ref.read(listProvider.notifier).addList(listName);
+                final name = nameController.text;
+                if (name.isNotEmpty) {
+                  await ref.read(listProvider.notifier).addList(name);
                   onCreateListSnackbar();
                   Navigator.of(context).pop();
                 }
               },
               child: Text('Adicionar'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  void _showEditListDialog(
+      BuildContext context, WidgetRef ref, String listId, String currentName) {
+    final TextEditingController nameController =
+        TextEditingController(text: currentName);
+
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: Text('Editar Nome da Lista'),
+          content: TextField(
+            controller: nameController,
+            decoration: InputDecoration(hintText: 'Nome da Lista'),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+              },
+              child: Text('Cancelar'),
+            ),
+            TextButton(
+              onPressed: () async {
+                final newName = nameController.text;
+                if (newName.isNotEmpty) {
+                  await ref
+                      .read(listProvider.notifier)
+                      .updateList(listId, newName);
+                  Navigator.of(context).pop();
+                }
+              },
+              child: Text('Salvar'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  void _showDeleteListDialog(
+      BuildContext context, WidgetRef ref, String listId) {
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: Text('Excluir Lista'),
+          content: Text('Tem certeza de que deseja excluir esta lista?'),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+              },
+              child: Text('Cancelar'),
+            ),
+            TextButton(
+              onPressed: () async {
+                await ref.read(listProvider.notifier).deleteList(listId);
+                Navigator.of(context).pop();
+              },
+              child: Text('Excluir'),
             ),
           ],
         );
